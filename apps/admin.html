@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WontOS Admin</title>
+<script src="../js/config.js"></script>
+<style>
+  :root{ --bg:#14141a; --panel:#1c1c24; --field:#0f0f15; --bd:#2c2c38; --tx:#e6e6ef; --mut:#8a8a99; --acc:#2a6fdb; --ok:#2ecc71; --warn:#ffb020; --danger:#ff5f56; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ background:var(--bg); color:var(--tx); font-family:-apple-system,Segoe UI,Roboto,sans-serif; font-size:13px; height:100vh; overflow:hidden; }
+  a{ color:var(--acc); }
+  /* login */
+  #login{ height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:24px; }
+  #login h1{ font-size:18px; font-weight:700; letter-spacing:.5px; }
+  #login p{ color:var(--mut); text-align:center; max-width:360px; line-height:1.5; }
+  .pw{ display:flex; gap:8px; }
+  input,textarea,select{ background:var(--field); color:var(--tx); border:1px solid var(--bd); border-radius:8px; padding:9px 11px; font:inherit; outline:none; width:100%; }
+  input:focus,textarea:focus{ border-color:var(--acc); }
+  textarea{ resize:vertical; min-height:64px; font-family:ui-monospace,Menlo,Consolas,monospace; line-height:1.45; }
+  button{ background:var(--acc); color:#fff; border:none; border-radius:8px; padding:9px 16px; font:inherit; font-weight:600; cursor:pointer; }
+  button:hover{ filter:brightness(1.1); }
+  button.ghost{ background:transparent; border:1px solid var(--bd); color:var(--tx); }
+  button.ok{ background:var(--ok); } button.danger{ background:var(--danger); }
+  .hidden{ display:none!important; }
+  /* app shell */
+  #app{ height:100vh; display:flex; flex-direction:column; }
+  header{ display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--bd); background:var(--panel); }
+  header h1{ font-size:14px; font-weight:700; }
+  header .sp{ flex:1; }
+  .tabs{ display:flex; gap:4px; padding:8px 12px; border-bottom:1px solid var(--bd); flex-wrap:wrap; background:var(--panel); }
+  .tab{ background:transparent; color:var(--mut); border:1px solid transparent; padding:7px 13px; border-radius:7px; cursor:pointer; font-weight:600; }
+  .tab.active{ background:var(--field); color:var(--tx); border-color:var(--bd); }
+  main{ flex:1; overflow:auto; padding:18px; }
+  .sec{ display:none; max-width:760px; }
+  .sec.active{ display:block; }
+  .field{ margin-bottom:14px; }
+  label{ display:block; margin-bottom:5px; color:var(--mut); font-weight:600; }
+  .hint{ color:var(--mut); font-size:11px; margin-top:4px; }
+  .row{ display:flex; gap:12px; flex-wrap:wrap; }
+  .row .field{ flex:1; min-width:200px; }
+  footer{ display:flex; align-items:center; gap:10px; padding:12px 16px; border-top:1px solid var(--bd); background:var(--panel); flex-wrap:wrap; }
+  #status{ color:var(--ok); font-weight:600; }
+  .banner{ background:rgba(255,176,32,.12); border:1px solid var(--warn); color:var(--warn); padding:8px 12px; border-radius:8px; margin-bottom:16px; font-size:12px; }
+  h2{ font-size:13px; margin:18px 0 10px; color:var(--acc); text-transform:uppercase; letter-spacing:.6px; }
+</style>
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="login">
+    <h1>🔒 WontOS Admin</h1>
+    <p>Enter the admin password to edit your apps' content.</p>
+    <div class="pw">
+      <input id="pw" type="password" placeholder="password" autocomplete="off" style="width:220px">
+      <button id="loginBtn">Unlock</button>
+    </div>
+    <p id="pwHint" class="hint"></p>
+  </div>
+
+  <!-- EDITOR -->
+  <div id="app" class="hidden">
+    <header>
+      <h1>⚙️ Admin — edit your apps</h1>
+      <span class="sp"></span>
+      <button class="ghost" id="lockBtn">Lock</button>
+    </header>
+    <div class="tabs">
+      <button class="tab active" data-sec="terminal">Terminal</button>
+      <button class="tab" data-sec="aboutme">About Me</button>
+      <button class="tab" data-sec="notepad">Notepad</button>
+      <button class="tab" data-sec="browser">Browser</button>
+      <button class="tab" data-sec="security">Security</button>
+    </div>
+    <main>
+      <!-- TERMINAL -->
+      <section class="sec active" data-sec="terminal">
+        <div class="row">
+          <div class="field"><label>Name</label><input id="t_name"></div>
+          <div class="field"><label>Tagline</label><input id="t_tagline"></div>
+        </div>
+        <div class="field"><label>Bio (one line per line)</label><textarea id="t_bio" rows="4"></textarea></div>
+        <div class="field"><label>Focus (one item per line)</label><textarea id="t_focus" rows="4"></textarea></div>
+        <div class="field"><label>Skills (one line per line — shown as-is)</label><textarea id="t_skills" rows="4"></textarea></div>
+        <div class="field"><label>Projects (one line per line)</label><textarea id="t_projects" rows="4"></textarea></div>
+        <h2>Contact</h2>
+        <div class="row">
+          <div class="field"><label>Web</label><input id="t_web"></div>
+          <div class="field"><label>Email</label><input id="t_email"></div>
+          <div class="field"><label>GitHub</label><input id="t_github"></div>
+        </div>
+      </section>
+      <!-- ABOUT ME -->
+      <section class="sec" data-sec="aboutme">
+        <div class="field"><label>Name</label><input id="a_name"></div>
+        <div class="field"><label>Title</label><input id="a_title"></div>
+        <div class="row">
+          <div class="field"><label>Location</label><input id="a_location"></div>
+          <div class="field"><label>Status</label><input id="a_status"></div>
+        </div>
+        <div class="field"><label>Skills (one per line, format: <code>Name | 90</code>)</label><textarea id="a_skills" rows="6"></textarea></div>
+        <div class="field"><label>Projects (one per line)</label><textarea id="a_projects" rows="4"></textarea></div>
+        <h2>Contact</h2>
+        <div class="row">
+          <div class="field"><label>Email</label><input id="a_email"></div>
+          <div class="field"><label>GitHub</label><input id="a_github"></div>
+          <div class="field"><label>Site</label><input id="a_site"></div>
+        </div>
+      </section>
+      <!-- NOTEPAD -->
+      <section class="sec" data-sec="notepad">
+        <div class="banner">Saving here replaces the Notepad's current text for everyone (it clears any locally-typed note).</div>
+        <div class="field"><label>Notepad content</label><textarea id="n_text" rows="14"></textarea></div>
+      </section>
+      <!-- BROWSER -->
+      <section class="sec" data-sec="browser">
+        <div class="field"><label>Default homepage URL</label><input id="b_home" placeholder="https://..."></div>
+        <div class="hint">The in-OS Web Browser opens here by default.</div>
+      </section>
+      <!-- SECURITY -->
+      <section class="sec" data-sec="security">
+        <div class="banner">This is a soft lock for a static site — it deters casual visitors but is not real security. Don't store anything sensitive behind it.</div>
+        <div class="row">
+          <div class="field"><label>New password</label><input id="s_pw1" type="password" autocomplete="new-password"></div>
+          <div class="field"><label>Confirm password</label><input id="s_pw2" type="password" autocomplete="new-password"></div>
+        </div>
+        <button id="pwSave">Change password</button>
+        <span id="pwMsg" class="hint"></span>
+      </section>
+    </main>
+    <footer>
+      <button class="ok" id="saveBtn">Save &amp; apply</button>
+      <button class="ghost" id="exportBtn">Export content.json</button>
+      <button class="ghost" id="importBtn">Import…</button>
+      <input id="importFile" type="file" accept="application/json,.json" class="hidden">
+      <button class="ghost danger" id="resetBtn">Reset local edits</button>
+      <span class="sp"></span>
+      <span id="status"></span>
+      <span class="hint">Export &amp; commit <code>content.json</code> to publish for everyone.</span>
+    </footer>
+  </div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var SS = 'wontos_admin_ok';
+
+  // ---------- login ----------
+  function showApp(){ $('login').classList.add('hidden'); $('app').classList.remove('hidden'); fillForm(); }
+  function tryLogin(){
+    if (WONT.checkPw($('pw').value)) { try{ sessionStorage.setItem(SS,'1'); }catch(e){} showApp(); }
+    else { $('pwHint').textContent = 'Wrong password.'; $('pwHint').style.color = 'var(--danger)'; }
+  }
+  $('loginBtn').onclick = tryLogin;
+  $('pw').addEventListener('keydown', function(e){ if(e.key==='Enter') tryLogin(); });
+  if (WONT.isDefaultPw()) { $('pwHint').textContent = "Default password is 'admin' — change it in the Security tab."; }
+  try { if (sessionStorage.getItem(SS)==='1') showApp(); } catch(e){}
+
+  // ---------- tabs ----------
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(tb){
+    tb.onclick = function(){
+      document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
+      document.querySelectorAll('.sec').forEach(function(x){ x.classList.remove('active'); });
+      tb.classList.add('active');
+      document.querySelector('.sec[data-sec="'+tb.dataset.sec+'"]').classList.add('active');
+    };
+  });
+
+  // ---------- helpers ----------
+  function linesToArr(s){ return s.split('\n').map(function(x){ return x.replace(/\s+$/,''); }).filter(function(x){ return x.trim()!==''; }); }
+  function arrToLines(a){ return (a||[]).join('\n'); }
+  function skillsToText(a){ return (a||[]).map(function(s){ return s.name + ' | ' + s.pct; }).join('\n'); }
+  function textToSkills(s){
+    return linesToArr(s).map(function(line){
+      var p = line.split('|'); var name=(p[0]||'').trim(); var pct=parseInt((p[1]||'').trim(),10);
+      if(isNaN(pct)) pct=50; pct=Math.max(0,Math.min(100,pct));
+      return { name:name, pct:pct };
+    });
+  }
+
+  // ---------- fill ----------
+  function fillForm(){
+    var c = WONT.effective();
+    var t=c.terminal||{};
+    $('t_name').value=t.name||''; $('t_tagline').value=t.tagline||'';
+    $('t_bio').value=arrToLines(t.bio); $('t_focus').value=arrToLines(t.focus);
+    $('t_skills').value=arrToLines(t.skills); $('t_projects').value=arrToLines(t.projects);
+    var tc=t.contact||{}; $('t_web').value=tc.web||''; $('t_email').value=tc.email||''; $('t_github').value=tc.github||'';
+    var a=c.aboutme||{};
+    $('a_name').value=a.name||''; $('a_title').value=a.title||''; $('a_location').value=a.location||''; $('a_status').value=a.status||'';
+    $('a_skills').value=skillsToText(a.skills); $('a_projects').value=arrToLines(a.projects);
+    var ac=a.contact||{}; $('a_email').value=ac.email||''; $('a_github').value=ac.github||''; $('a_site').value=ac.site||'';
+    $('n_text').value=(c.notepad&&c.notepad.text)||'';
+    $('b_home').value=(c.browser&&c.browser.homepage)||'';
+  }
+
+  // ---------- build ----------
+  function buildConfig(){
+    return {
+      terminal:{
+        name:$('t_name').value, tagline:$('t_tagline').value,
+        bio:linesToArr($('t_bio').value), focus:linesToArr($('t_focus').value),
+        skills:linesToArr($('t_skills').value), projects:linesToArr($('t_projects').value),
+        contact:{ web:$('t_web').value, email:$('t_email').value, github:$('t_github').value }
+      },
+      aboutme:{
+        name:$('a_name').value, title:$('a_title').value, location:$('a_location').value, status:$('a_status').value,
+        skills:textToSkills($('a_skills').value), projects:linesToArr($('a_projects').value),
+        contact:{ email:$('a_email').value, github:$('a_github').value, site:$('a_site').value }
+      },
+      notepad:{ text:$('n_text').value },
+      browser:{ homepage:$('b_home').value }
+    };
+  }
+
+  function flash(msg){ $('status').textContent=msg; setTimeout(function(){ $('status').textContent=''; }, 2500); }
+
+  // ---------- actions ----------
+  $('saveBtn').onclick = function(){
+    var cfg = buildConfig();
+    WONT.save(cfg);
+    // notepad lives in the OS's own store too — clear it so the new text shows
+    try { var m=JSON.parse(localStorage.getItem('mockos_v1')||'{}'); delete m.notepad; localStorage.setItem('mockos_v1', JSON.stringify(m)); } catch(e){}
+    flash('Saved — reloading…');
+    setTimeout(function(){ try{ window.top.location.reload(); }catch(e){ location.reload(); } }, 600);
+  };
+
+  $('exportBtn').onclick = function(){
+    var blob = new Blob([JSON.stringify(buildConfig(), null, 2)], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href=url; a.download='content.json'; document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    flash('Exported content.json');
+  };
+
+  $('importBtn').onclick = function(){ $('importFile').click(); };
+  $('importFile').onchange = function(e){
+    var file = e.target.files[0]; if(!file) return;
+    var r = new FileReader();
+    r.onload = function(){ try{ var cfg=JSON.parse(r.result); WONT.save(cfg); flash('Imported — reloading…'); setTimeout(function(){ try{ window.top.location.reload(); }catch(e){ location.reload(); } }, 600); } catch(err){ alert('Invalid JSON: '+err.message); } };
+    r.readAsText(file);
+  };
+
+  $('resetBtn').onclick = function(){
+    if(!confirm('Discard your local edits and revert to the published/default content?')) return;
+    WONT.reset(); flash('Reset — reloading…');
+    setTimeout(function(){ try{ window.top.location.reload(); }catch(e){ location.reload(); } }, 600);
+  };
+
+  $('lockBtn').onclick = function(){ try{ sessionStorage.removeItem(SS); }catch(e){} location.reload(); };
+
+  $('pwSave').onclick = function(){
+    var a=$('s_pw1').value, b=$('s_pw2').value;
+    if(a.length<3){ $('pwMsg').textContent='Too short (min 3).'; $('pwMsg').style.color='var(--danger)'; return; }
+    if(a!==b){ $('pwMsg').textContent='Passwords do not match.'; $('pwMsg').style.color='var(--danger)'; return; }
+    WONT.setPw(a); $('s_pw1').value=''; $('s_pw2').value='';
+    $('pwMsg').textContent='Password changed.'; $('pwMsg').style.color='var(--ok)';
+  };
+})();
+</script>
+</body>
+</html>
