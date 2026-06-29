@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="js/dc-runtime.js"></script>
+<script src="js/config.js"></script>
 </head>
 <body>
 <x-dc>
@@ -421,6 +422,13 @@
             </div>
           </sc-if>
 
+          <!-- ADMIN -->
+          <sc-if value="{{ win.isAdmin }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;position:relative;background:#14141a;">
+              <iframe src="apps/admin.html" style="width:100%;height:100%;border:none;display:block;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads allow-modals"></iframe>
+            </div>
+          </sc-if>
+
           <!-- ABOUT ME -->
           <sc-if value="{{ win.isAboutme }}" hint-placeholder-val="{{ false }}">
             <div style="flex:1;min-height:0;position:relative;background:#000;">
@@ -694,7 +702,7 @@ class Component extends DCLogic {
     super(props);
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('mockos_v1') || '{}'); } catch(e){}
-    const site = props.websiteUrl || 'https://wontfallo.github.io/';
+    const site = (window.WONT && WONT.effective().browser && WONT.effective().browser.homepage) || props.websiteUrl || 'https://wontfallo.github.io/';
     this.uname = (props.userName || 'Wontfallo').trim() || 'Wontfallo';
     const vw = (typeof window!=='undefined'?window.innerWidth:1440);
     const vh = (typeof window!=='undefined'?window.innerHeight:900);
@@ -704,7 +712,7 @@ class Component extends DCLogic {
       mode: saved.mode || props.defaultMode || 'dark',
       accent: saved.accent || '#2a6fdb',
       wallpaper: saved.wallpaper || 'slate',
-      notepad: saved.notepad != null ? saved.notepad : "Welcome to Notepad.\n\nThis is a real text editor — type anything and it auto-saves.\nTip: open the Terminal and run  /about --me\n",
+      notepad: saved.notepad != null ? saved.notepad : (window.WONT ? WONT.effective().notepad.text : ""),
       windows: [{ id:1, app:'terminal', title:'Terminal', x:Math.round(vw/2 - tW/2), y:Math.round(vh*0.44 - tH/2), w:tW, h:tH, z:11, min:false, max:false }],
       maxZ: 11, nextId: 2,
       ctx: { open:false, x:0, y:0, type:'desktop', app:null },
@@ -969,7 +977,7 @@ class Component extends DCLogic {
   appDefs(){ return {
     terminal:['Terminal',700,440], calc:['Calculator',300,452], notepad:['Notepad',560,440],
     paint:['Paint',780,540], browser:['Web Browser',960,640], explorer:['Files',760,500], settings:['Settings',740,560],
-    flasher:['ESP Flasher',1040,1030], dork:['Dork Generator',920,700], aboutme:['About Me',860,600]
+    flasher:['ESP Flasher',1040,1030], dork:['Dork Generator',920,700], aboutme:['About Me',860,600], admin:['Admin',900,640]
   }; }
   iconFor(app){ const I=this.osIcons(); return (I[app]&&I[app].icon) || '▦'; }
   osIcons(){
@@ -985,6 +993,7 @@ class Component extends DCLogic {
       flasher:{ icon:'\u26A1\uFE0E', label:'ESP Flasher' },
       dork:{ icon:'\uD83D\uDD0D', label:'Dork Generator' },
       aboutme:{ icon:'👤', label:'About Me' },
+      admin:{ icon:'🔧', label:'Admin' },
       trash:{ icon:'🗑️', label:'Recycle Bin' },
     };
     if(os==='classic') return { ...base,
@@ -1002,6 +1011,7 @@ class Component extends DCLogic {
       flasher:{ icon:'\u26A1\uFE0E', label:'ESP Flasher' },
       dork:{ icon:'\uD83D\uDD0D', label:'Dork Generator' },
       aboutme:{ icon:'👤', label:'About Me' },
+      admin:{ icon:'🔧', label:'Admin' },
       trash:{ icon:'🗑️', label:'Trash' } };
     if(os==='linux') return {
       explorer:{ icon:'🏠', label:'Home' },
@@ -1014,6 +1024,7 @@ class Component extends DCLogic {
       flasher:{ icon:'\u26A1\uFE0E', label:'ESP Flasher' },
       dork:{ icon:'\uD83D\uDD0D', label:'Dork Generator' },
       aboutme:{ icon:'👤', label:'About Me' },
+      admin:{ icon:'🔧', label:'Admin' },
       trash:{ icon:'🗑️', label:'Trash' } };
     if(os==='terminal') return {
       explorer:{ icon:'~/', label:'files', box:true },
@@ -1026,6 +1037,7 @@ class Component extends DCLogic {
       flasher:{ icon:'\u26a1', label:'flash', box:true },
       dork:{ icon:'?', label:'dork', box:true },
       aboutme:{ icon:'i', label:'about', box:true },
+      admin:{ icon:'#', label:'admin', box:true },
       trash:{ icon:'x', label:'.trash', box:true } };
     return base; // fluent
   }
@@ -1034,7 +1046,7 @@ class Component extends DCLogic {
     // each app has a home region; repeats jitter around it so nothing stacks exactly
     const homes = {
       terminal:[0.50,0.44], browser:[0.62,0.40], flasher:[0.30,0.50], settings:[0.30,0.56],
-      explorer:[0.28,0.36], paint:[0.46,0.50], calc:[0.40,0.40], notepad:[0.58,0.58], dork:[0.55,0.46], aboutme:[0.5,0.42]
+      explorer:[0.28,0.36], paint:[0.46,0.50], calc:[0.40,0.40], notepad:[0.58,0.58], dork:[0.55,0.46], aboutme:[0.5,0.42], admin:[0.45,0.44]
     };
     const seq = [[0.50,0.44],[0.27,0.34],[0.72,0.40],[0.34,0.64],[0.66,0.62],[0.50,0.30],[0.80,0.58],[0.20,0.54]];
     const home = homes[app] || seq[openCount % seq.length];
@@ -1134,28 +1146,17 @@ class Component extends DCLogic {
     { t:'out', x:'' },
   ]; }
   prompt(){ return (this.uname||'guest').toLowerCase().replace(/[^a-z0-9_-]/g,'')+'@wontos:~$'; }
-  aboutLines(){ return [
+  aboutLines(){ var c=window.WONT?WONT.effective().terminal:{}; var L=[
     { t:'accent', x:'╭─ about --me ─────────────────────────────╮' },
-    { t:'out',  x:'' },
-    { t:'accent', x:'  [ YOUR NAME ]' },
-    { t:'dim',  x:'  Engineer · Technician · Security · Maker' },
-    { t:'out',  x:'' },
-    { t:'out',  x:"  I'm a software & hardware hacker and a" },
-    { t:'out',  x:'  lifelong learner. I work across systems' },
-    { t:'out',  x:'  engineering, cyber security, and anything' },
-    { t:'out',  x:'  I can take apart and rebuild better.' },
-    { t:'out',  x:'' },
-    { t:'accent', x:'  focus' },
-    { t:'out',  x:'    · Software engineering & automation' },
-    { t:'out',  x:'    · Hardware / electronics / embedded' },
-    { t:'out',  x:'    · Cyber security & red-teaming' },
-    { t:'out',  x:'' },
-    { t:'dim',  x:"  ( edit me — replace the brackets with" },
-    { t:'dim',  x:'    your own details whenever you like )' },
-    { t:'out',  x:'' },
-    { t:'accent', x:'  next:  skills · projects · contact' },
-    { t:'accent', x:'╰──────────────────────────────────────────╯' },
-  ]; }
+    { t:'out', x:'' },
+    { t:'accent', x:'  '+(c.name||'') },
+    { t:'dim', x:'  '+(c.tagline||'') },
+    { t:'out', x:'' } ];
+    (c.bio||[]).forEach(function(b){ L.push({ t:'out', x:'  '+b }); });
+    L.push({ t:'out', x:'' }, { t:'accent', x:'  focus' });
+    (c.focus||[]).forEach(function(f){ L.push({ t:'out', x:'    · '+f }); });
+    L.push({ t:'out', x:'' }, { t:'accent', x:'  next:  skills · projects · contact' }, { t:'accent', x:'╰──────────────────────────────────────────╯' });
+    return L; }
   helpLines(){ return [
     { t:'accent', x:'available commands' },
     { t:'out', x:'  /about --me   who I am' },
@@ -1170,27 +1171,9 @@ class Component extends DCLogic {
     { t:'out', x:'  date          current date/time' },
     { t:'out', x:'  clear         clear the screen' },
   ]; }
-  skillLines(){ return [
-    { t:'accent', x:'skills' },
-    { t:'out', x:'  languages   [ Python, C, JS, Bash, ... ]' },
-    { t:'out', x:'  security    [ pentesting, hardening, forensics ]' },
-    { t:'out', x:'  hardware    [ embedded, electronics, RF, repair ]' },
-    { t:'out', x:'  systems     [ Linux, networking, automation ]' },
-    { t:'dim', x:'  (placeholders — make them yours)' },
-  ]; }
-  projectLines(){ return [
-    { t:'accent', x:'projects' },
-    { t:'out', x:'  01  [ project name ] — what it does' },
-    { t:'out', x:'  02  [ project name ] — what it does' },
-    { t:'out', x:'  03  [ project name ] — what it does' },
-    { t:'dim', x:"  tip: open the browser to see my live site" },
-  ]; }
-  contactLines(){ return [
-    { t:'accent', x:'contact' },
-    { t:'out', x:'  web     https://wontfallo.github.io/' },
-    { t:'out', x:'  email   [ you@example.com ]' },
-    { t:'out', x:'  github  [ @yourhandle ]' },
-  ]; }
+  skillLines(){ var c=window.WONT?WONT.effective().terminal:{}; var L=[{ t:'accent', x:'skills' }]; (c.skills||[]).forEach(function(s){ L.push({ t:'out', x:'  '+s }); }); return L; }
+  projectLines(){ var c=window.WONT?WONT.effective().terminal:{}; var L=[{ t:'accent', x:'projects' }]; (c.projects||[]).forEach(function(p){ L.push({ t:'out', x:'  '+p }); }); L.push({ t:'dim', x:'  tip: open the browser to see my live site' }); return L; }
+  contactLines(){ var k=(window.WONT?WONT.effective().terminal.contact:null)||{}; return [{ t:'accent', x:'contact' },{ t:'out', x:'  web     '+(k.web||'') },{ t:'out', x:'  email   '+(k.email||'') },{ t:'out', x:'  github  '+(k.github||'') }]; }
   neofetch(){ return [
     { t:'accent', x:'        '+(this.uname||'guest').toLowerCase().replace(/[^a-z0-9_-]/g,'')+'@wontos' },
     { t:'dim', x:'        --------------' },
@@ -1577,7 +1560,7 @@ class Component extends DCLogic {
       return {
         id:w.id, app:w.app, title:w.title,
         isTerminal:w.app==='terminal', isCalc:w.app==='calc', isNotepad:w.app==='notepad',
-        isPaint:w.app==='paint', isBrowser:w.app==='browser', isExplorer:w.app==='explorer', isSettings:w.app==='settings', isFlasher:w.app==='flasher', isDork:w.app==='dork', isAboutme:w.app==='aboutme',
+        isPaint:w.app==='paint', isBrowser:w.app==='browser', isExplorer:w.app==='explorer', isSettings:w.app==='settings', isFlasher:w.app==='flasher', isDork:w.app==='dork', isAboutme:w.app==='aboutme', isAdmin:w.app==='admin',
         style: { position:'absolute', ...geom, zIndex:w.z, display: w.min?'none':'flex', flexDirection:'column',
           background:'var(--win-bg)', color:'var(--win-text)', border:'var(--win-border)',
           borderRadius: w.max?'0':'var(--win-radius)', boxShadow:'var(--win-shadow)', overflow:'hidden',
@@ -1643,7 +1626,7 @@ class Component extends DCLogic {
 
     // ----- per-OS app icon map -----
     const APPICONS = this.osIcons();
-    const APPORDER = ['explorer','browser','terminal','flasher','dork','aboutme','paint','calc','notepad','settings'];
+    const APPORDER = ['explorer','browser','terminal','flasher','dork','aboutme','admin','paint','calc','notepad','settings'];
     const big = isLinux;
     const startApps = APPORDER.map(app=>{ const ic=APPICONS[app]; const boxed=!!ic.box; return { app, icon:ic.icon, name:ic.label,
       style: big

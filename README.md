@@ -35,6 +35,24 @@ python -m http.server 8000
 
 then open <http://localhost:8000>.
 
+## Admin panel (editable content)
+
+Open the **Admin** app (🔧) on the desktop to edit the content of the Terminal,
+About Me, Notepad, and Browser apps. Default password is `admin` — **change it**
+in the Security tab (it's a soft lock for a static site, not real security).
+
+Content layering (`js/config.js`):
+
+```
+DEFAULTS (in config.js)  ←  content.json (committed, global)  ←  localStorage (your browser)
+```
+
+- **Save & apply** — stores your edits in this browser (localStorage) and reloads.
+  Only you see them.
+- **Export content.json** — downloads your edits; commit the file to the repo root
+  to publish them for **all** visitors.
+- **Reset local edits** — clears your browser overrides, back to published/defaults.
+
 ## Note on editing
 
 `index.html` holds a compiled dc-runtime component tree, not hand-authored markup.

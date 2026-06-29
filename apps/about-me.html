@@ -291,6 +291,7 @@
         </div>
     </div>
 
+    <script src="../js/config.js"></script>
     <script>
         // Matrix effect
         const canvas = document.getElementById('matrix');
@@ -341,70 +342,34 @@
         const commandLine = document.getElementById('command-line');
         const commandInput = document.getElementById('command-input');
         
-        const messages = [
-            { text: "Initializing system...", delay: 50 },
-            { text: "Loading profile data...", delay: 50 },
-            { text: "██████████████ 100%", delay: 30, style: "color: #0ff" },
-            { text: "\n", delay: 200 },
-            { text: "> Welcome to CYBER TERMINAL // ACCESS GRANTED", delay: 10, style: "color: #0f0; font-weight: bold" },
-            { text: "\n\n", delay: 100 },
-            { text: ">> SYSTEM USER PROFILE <<", delay: 10, style: "color: #b19cd9; text-decoration: underline" },
-            { text: "\n", delay: 100 },
-            { text: "> NAME: ", delay: 20 },
-            { text: "Wontfallo", delay: 100, style: "color: #0ff; font-weight: bold" },
-            { text: "", delay: 100, style: "color: #0f0; font-weight: bold" },
-            { text: "\n", delay: 50 },
-            { text: "> TITLE: ", delay: 20 },
-            { text: "ENGINEER // EMBEDDED · FULL-STACK · CYBERSEC · ELECTRONICS · CRYOGENICS", delay: 30, style: "color: #0ff" },
-            { text: "\n", delay: 50 },
-            { text: "> LOCATION: ", delay: 20 },
-            { text: "[DATA ENCRYPTED]", delay: 70, style: "color: #f44" },
-            { text: "\n", delay: 50 },
-            { text: "> STATUS: ", delay: 20 },
-            { text: "ONLINE // MAKING HARDWARE AND SOFTWARE TALK", delay: 30, style: "color: #0f0" },
-            { text: "\n\n", delay: 100 },
-            { text: ">> SKILL MATRIX <<", delay: 10, style: "color: #b19cd9; text-decoration: underline" },
-            { text: "\n", delay: 100 },
-            { text: "> C / C++ (EMBEDDED): ", delay: 20 },
-            { text: "█████████ 90%", delay: 30, style: "color: #0ff" },
-            { text: "\n", delay: 50 },
-            { text: "> ESP-IDF / PLATFORMIO: ", delay: 20 },
-            { text: "█████████ 90%", delay: 30, style: "color: #0ff" },
-            { text: "\n", delay: 50 },
-            { text: "> ELECTRONICS / PCB: ", delay: 20 },
-            { text: "████████▊ 88%", delay: 30, style: "color: #0ff" },
-            { text: "\n", delay: 50 },
-            { text: "> JAVASCRIPT / WEB: ", delay: 20 },
-            { text: "████████▌ 85%", delay: 30, style: "color: #0ff" },
-            { text: "\n", delay: 50 },
-            { text: "> CYBERSECURITY: ", delay: 20 },
-            { text: "████████▎ 82%", delay: 30, style: "color: #0ff" },
-            { text: "\n", delay: 50 },
-            { text: "> CRYOGENICS: ", delay: 20 },
-            { text: "███████▍ 75%", delay: 30, style: "color: #0ff" },
-            { text: "\n\n", delay: 100 },
-            { text: ">> PROJECT HISTORY <<", delay: 10, style: "color: #b19cd9; text-decoration: underline" },
-            { text: "\n", delay: 100 },
-            { text: "> WontOS — browser desktop OS with a built-in ESP32 web flasher", delay: 20 },
-            { text: "\n", delay: 50 },
-            { text: "> Wonthound — ESP32-S3 / ESP32-C5 / CYD firmware builds", delay: 20 },
-            { text: "\n", delay: 50 },
-            { text: "> ESP Web Flasher — flash firmware from the browser (esptool-js)", delay: 20 },
-            { text: "\n\n", delay: 100 },
-            { text: ">> CONTACT POINTS <<", delay: 10, style: "color: #b19cd9; text-decoration: underline" },
-            { text: "\n", delay: 100 },
-            { text: "> EMAIL: ", delay: 20 },
-            { text: "budtron10@gmail.com", delay: 30, style: "color: #0ff" },
-            { text: "\n", delay: 50 },
-            { text: "> GITHUB: ", delay: 20 },
-            { text: "github.com/Wontfallo", delay: 30, style: "color: #0ff" },
-            { text: "\n", delay: 50 },
-            { text: "> SITE: ", delay: 20 },
-            { text: "wontfallo.github.io", delay: 30, style: "color: #0ff" },
-            { text: "\n\n", delay: 100 },
-            { text: "> Type 'help' for available commands", delay: 30, style: "color: #0f0" },
-            { text: "\n", delay: 50 },
-        ];
+        const C = (window.WONT ? WONT.effective().aboutme : {});
+        function bar(pct){ var n=Math.max(0,Math.min(10,Math.round(pct/10))); return '█'.repeat(n) + ' ' + pct + '%'; }
+        const messages = [];
+        function add(text,delay,style){ messages.push(style?{text:text,delay:delay,style:style}:{text:text,delay:delay}); }
+        add("Initializing system...",50);
+        add("Loading profile data...",50);
+        add("██████████████ 100%",30,"color: #0ff");
+        add("\n",200);
+        add("> Welcome to CYBER TERMINAL // ACCESS GRANTED",10,"color: #0f0; font-weight: bold");
+        add("\n\n",100);
+        add(">> SYSTEM USER PROFILE <<",10,"color: #b19cd9; text-decoration: underline");
+        add("\n",100);
+        add("> NAME: ",20); add(C.name||"",80,"color: #0ff; font-weight: bold"); add("\n",50);
+        add("> TITLE: ",20); add(C.title||"",20,"color: #0ff"); add("\n",50);
+        add("> LOCATION: ",20); add(C.location||"",60,"color: #f44"); add("\n",50);
+        add("> STATUS: ",20); add(C.status||"",20,"color: #0f0"); add("\n\n",100);
+        add(">> SKILL MATRIX <<",10,"color: #b19cd9; text-decoration: underline"); add("\n",100);
+        (C.skills||[]).forEach(function(s){ add("> "+s.name+": ",20); add(bar(s.pct),25,"color: #0ff"); add("\n",50); });
+        add("\n",1);
+        add(">> PROJECT HISTORY <<",10,"color: #b19cd9; text-decoration: underline"); add("\n",100);
+        (C.projects||[]).forEach(function(p){ add("> "+p,15); add("\n",50); });
+        add("\n",1);
+        add(">> CONTACT POINTS <<",10,"color: #b19cd9; text-decoration: underline"); add("\n",100);
+        var ct = C.contact||{};
+        add("> EMAIL: ",20); add(ct.email||"",25,"color: #0ff"); add("\n",50);
+        add("> GITHUB: ",20); add(ct.github||"",25,"color: #0ff"); add("\n",50);
+        add("> SITE: ",20); add(ct.site||"",25,"color: #0ff"); add("\n\n",100);
+        add("> Type 'help' for available commands",20,"color: #0f0"); add("\n",50);
         
         let currentMessageIndex = 0;
         let currentCharIndex = 0;
@@ -470,28 +435,23 @@
                 - <span class="highlight">exit</span>: Close terminal (just kidding)`;
             } 
             else if (command === 'about') {
+                var c = (window.WONT ? WONT.effective().aboutme : {});
                 response.innerHTML = `// SYSTEM USER PROFILE //<br><br>
-                <span class="highlight">Wontfallo</span> is an engineer who builds across the whole stack — and down to the silicon:<br>
-                - Embedded firmware & ESP32 hardware<br>
-                - Full-stack web (this OS runs in your browser)<br>
-                - Cybersecurity & tooling<br>
-                - Electronics, PCBs & cryogenics<br><br>
-                I like making hardware and software talk to each other — from flashing chips over USB to shipping a desktop OS on a static site.`;
+                <span class="highlight">${c.name||''}</span><br>
+                <span style="color:#0ff">${c.title||''}</span><br><br>
+                ${c.status||''}`;
             }
             else if (command === 'skills') {
-                response.innerHTML = `>> TECHNICAL PROWESS <<<br><br>
-                <div class="skill-bar"><span class="skill-name">C / C++:</span> <span class="skill-level" style="width: 90%"></span></div>
-                <div class="skill-bar"><span class="skill-name">ESP-IDF/PIO:</span> <span class="skill-level" style="width: 90%"></span></div>
-                <div class="skill-bar"><span class="skill-name">Electronics:</span> <span class="skill-level" style="width: 88%"></span></div>
-                <div class="skill-bar"><span class="skill-name">JS / Web:</span> <span class="skill-level" style="width: 85%"></span></div>
-                <div class="skill-bar"><span class="skill-name">Cybersecurity:</span> <span class="skill-level" style="width: 82%"></span></div>
-                <div class="skill-bar"><span class="skill-name">Cryogenics:</span> <span class="skill-level" style="width: 75%"></span></div>`;
+                var c2 = (window.WONT ? WONT.effective().aboutme : {});
+                response.innerHTML = '>> TECHNICAL PROWESS <<<br><br>' + (c2.skills||[]).map(function(s){ return `<div class="skill-bar"><span class="skill-name">${s.name}:</span> <span class="skill-level" style="width: ${s.pct}%"></span></div>`; }).join('');
             }
             else if (command === 'contact') {
+                var c3 = ((window.WONT ? WONT.effective().aboutme : {}).contact)||{};
+                var gh=(c3.github||'').replace(/^https?:\/\//,''); var st=(c3.site||'').replace(/^https?:\/\//,'');
                 response.innerHTML = `>> CONTACT CHANNELS <<<br><br>
-                <div class="contact-item">Email: <a href="mailto:budtron10@gmail.com">budtron10@gmail.com</a></div>
-                <div class="contact-item">GitHub: <a href="https://github.com/Wontfallo" target="_blank">github.com/Wontfallo</a></div>
-                <div class="contact-item">Site: <a href="https://wontfallo.github.io" target="_blank">wontfallo.github.io</a></div>`;
+                <div class="contact-item">Email: <a href="mailto:${c3.email||''}">${c3.email||''}</a></div>
+                <div class="contact-item">GitHub: <a href="https://${gh}" target="_blank">${c3.github||''}</a></div>
+                <div class="contact-item">Site: <a href="https://${st}" target="_blank">${c3.site||''}</a></div>`;
             }
             else if (command === 'clear') {
                 terminalText.innerHTML = '';
