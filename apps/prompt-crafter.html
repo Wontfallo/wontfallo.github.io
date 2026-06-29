@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Prompt Crafter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { background-color: #111827; color: #d1d5db; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Constants ---
+        const DEFAULT_LM_STUDIO_URL = 'http://localhost:1234/v1';
+        const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
+
+        const VIDEO_MODEL_PROMPTS = {
+            'wan2.2': `You are an expert prompt engineer for the Wan 2.2 video generation model. Your task is to craft highly detailed, cinematic video prompts that include specific camera movements, lighting, composition, color grading, and emotional elements. Always output only the final prompt without any additional text, explanations, or formatting.`,
+            'flux': `You are an expert prompt engineer for the Flux image generation model. Your task is to craft a single, concise, and highly descriptive paragraph for a text-to-image prompt. Focus on visual details, style, and composition. Do not use lists or labels. Always output only the final prompt paragraph without any additional text or explanations.`,
+            'qwen': `You are an expert prompt engineer for the Qwen-VL text-to-image model. Your task is to create a detailed prompt focusing on photorealistic or artistic styles. Describe the subject, scene, lighting, and composition clearly. The prompt should be a single block of text. Always output only the final prompt without any additional text or explanations.`
+        };
+
+        const CREATIVITY_MODES = {
+            precise: {
+                name: 'Precise Mode',
+                description: 'Strict adherence to input with minimal creative interpretation',
+                temperature: 0.3,
+                systemPrompt: (videoModel) => `${VIDEO_MODEL_PROMPTS[videoModel]} Use precise, technical language with minimal creative interpretation. Focus on exact specifications provided by the user.`
+            },
+            creative: {
+                name: 'Creative Mode',
+                description: 'Enhanced creative interpretation with cinematic flair',
+                temperature: 0.7,
+                systemPrompt: (videoModel) => `${VIDEO_MODEL_PROMPTS[videoModel]} Apply creative interpretation to enhance cinematic quality. Add appropriate camera movements, lighting, composition, and emotional elements that complement the user's input while maintaining the core concept.`
+            }
+        };
+
+        const SERVICE_CONFIGS = {
+            lmstudio: { name: 'LM Studio', defaultUrl: DEFAULT_LM_STUDIO_URL, pullVisible: false },
+            ollama:   { name: 'Ollama',    defaultUrl: DEFAULT_OLLAMA_URL,    pullVisible: true  }
+        };
+
+        // ---- helpers --------------------------------------------------------
+        // LM Studio chat lives at <endpoint>/chat/completions  (the /v1 OpenAI base),
+        // but model management lives at <host>/api/v1/models...  (a different base).
+        const lmHost = (endpoint) => endpoint.replace(/\/+$/, '').replace(/\/v1$/, '');
+
+        function App() {
+            const [service, setService] = useState('lmstudio');
+            const [endpoint, setEndpoint] = useState(DEFAULT_LM_STUDIO_URL);
+            const [apiKey, setApiKey] = useState('');          // optional LM Studio token
+            const [models, setModels] = useState([]);          // [{ id, loaded, instanceId }]
+            const [selectedLLM, setSelectedLLM] = useState('');
+            const [videoModel, setVideoModel] = useState('wan2.2');
+            const [creativityMode, setCreativityMode] = useState('precise');
+            const [inputText, setInputText] = useState('');
+            const [outputText, setOutputText] = useState('');
+            const [negativePrompt, setNegativePrompt] = useState('');
+            const [negPromptLocked, setNegPromptLocked] = useState(true);
+            const [isLoading, setIsLoading] = useState(false);
+            const [isBusy, setIsBusy] = useState(false);       // load/unload/refresh in flight
+            const [isInspiring, setIsInspiring] = useState(false);
+            const [status, setStatus] = useState('');
+            const [history, setHistory] = useState([]);
+            const [showHistory, setShowHistory] = useState(false);
+            const [historySearch, setHistorySearch] = useState('');
+
+            const outputRef = useRef(null);
+
+            useEffect(() => {
+                try {
+                    const savedHistory = localStorage.getItem('ai_prompt_crafter_history');
+                    if (savedHistory) setHistory(JSON.parse(savedHistory));
+                } catch (e) { console.error('Failed to parse history', e); }
+            }, []);
+
+            const flash = (msg, ms = 3500) => { setStatus(msg); if (ms) setTimeout(() => setStatus(s => s === msg ? '' : s), ms); };
+
+            const filteredHistory = history.filter(item => {
+                if (!historySearch) return true;
+                const searchTerm = historySearch.toLowerCase();
+                return Object.values(item).some(val => String(val).toLowerCase().includes(searchTerm));
+            }).sort((a, b) => b.id - a.id);
+
+            const updateService = (newService) => {
+                setService(newService);
+                const config = SERVICE_CONFIGS[newService];
+                setEndpoint(config.defaultUrl);
+                setSelectedLLM('');
+                setModels([]);
+                setStatus('');
+            };
+
+            const authHeaders = () => {
+                const h = { 'Content-Type': 'application/json' };
+                if (service === 'lmstudio' && apiKey.trim()) h['Authorization'] = 'Bearer ' + apiKey.trim();
+                return h;
+            };
+
+            const explain = (error) => {
+                let msg = error && error.message ? error.message : String(error);
+                if (error instanceof TypeError) {
+                    msg += '\n\nThis is usually CORS, the service not running, or mixed-content ' +
+                           '(an https page cannot call http://localhost). ' +
+                           (service === 'lmstudio'
+                             ? 'In LM Studio, enable the local server and turn on CORS (Server settings).'
+                             : 'For Ollama, set OLLAMA_ORIGINS to allow this page\'s origin.');
+                }
+                return msg;
+            };
+
+            // ---- list models -------------------------------------------------
+            const refreshModels = async () => {
+                if (!endpoint) return;
+                setIsBusy(true); setStatus('Refreshing models…');
+                try {
+                    if (service === 'ollama') {
+                        const res = await fetch(`${endpoint}/api/tags`);
+                        if (!res.ok) throw new Error(`Ollama /api/tags ${res.status} ${res.statusText}`);
+                        const data = await res.json();
+                        const names = (data.models || []).map(m => m.name);
+                        // which are currently loaded?
+                        let running = [];
+                        try {
+                            const ps = await fetch(`${endpoint}/api/ps`);
+                            if (ps.ok) { const pj = await ps.json(); running = (pj.models || []).map(m => m.name); }
+                        } catch (e) { /* /api/ps optional */ }
+                        setModels(names.map(n => ({ id: n, loaded: running.includes(n), instanceId: n })));
+                        flash(`Found ${names.length} model(s).`);
+                    } else {
+                        // LM Studio: prefer the current /api/v1/models (has load state),
+                        // fall back to the OpenAI-compatible /v1/models on older builds.
+                        const host = lmHost(endpoint);
+                        let list = null;
+                        try {
+                            const res = await fetch(`${host}/api/v1/models`, { headers: authHeaders() });
+                            if (res.ok) {
+                                const data = await res.json();
+                                const arr = data.data || data.models || [];
+                                list = arr.map(m => {
+                                    const inst = (m.loaded_instances && m.loaded_instances[0]) || null;
+                                    const instanceId = inst ? (typeof inst === 'string' ? inst : (inst.instance_id || inst.id)) : null;
+                                    return {
+                                        id: m.key || m.id,
+                                        loaded: !!(m.loaded_instances && m.loaded_instances.length) || m.state === 'loaded',
+                                        instanceId: instanceId || (m.key || m.id)
+                                    };
+                                });
+                            }
+                        } catch (e) { /* fall through to /v1 */ }
+                        if (!list) {
+                            const res = await fetch(`${endpoint}/models`, { headers: authHeaders() });
+                            if (!res.ok) throw new Error(`LM Studio /models ${res.status} ${res.statusText}`);
+                            const data = await res.json();
+                            list = (data.data || []).map(m => ({ id: m.id, loaded: false, instanceId: m.id }));
+                        }
+                        setModels(list);
+                        flash(`Found ${list.length} model(s).`);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch models:', error);
+                    setModels([]);
+                    flash('Refresh failed — see details.', 6000);
+                    alert('Failed to fetch models.\n\n' + explain(error));
+                } finally {
+                    setIsBusy(false);
+                }
+            };
+
+            // ---- load into memory -------------------------------------------
+            const loadModel = async (modelId) => {
+                if (!modelId) return;
+                setIsBusy(true); setStatus(`Loading ${modelId}…`);
+                try {
+                    if (service === 'ollama') {
+                        const res = await fetch(`${endpoint}/api/generate`, {
+                            method: 'POST', headers: authHeaders(),
+                            body: JSON.stringify({ model: modelId, keep_alive: -1 })
+                        });
+                        if (!res.ok) throw new Error(`Ollama load ${res.status}: ${await res.text().catch(() => '')}`);
+                        await res.json().catch(() => null);
+                    } else {
+                        const res = await fetch(`${lmHost(endpoint)}/api/v1/models/load`, {
+                            method: 'POST', headers: authHeaders(),
+                            body: JSON.stringify({ model: modelId })
+                        });
+                        if (!res.ok) throw new Error(`LM Studio load ${res.status}: ${await res.text().catch(() => '')}`);
+                        await res.json().catch(() => null);
+                    }
+                    flash(`Loaded ${modelId}.`);
+                    await refreshModels();
+                } catch (error) {
+                    console.error('Load failed:', error);
+                    alert('Failed to load model.\n\n' + explain(error));
+                } finally {
+                    setIsBusy(false);
+                }
+            };
+
+            // ---- unload from memory -----------------------------------------
+            const unloadModel = async (modelId) => {
+                if (!modelId) return;
+                if (!confirm(`Unload "${modelId}" from memory? (The model file is kept.)`)) return;
+                setIsBusy(true); setStatus(`Unloading ${modelId}…`);
+                try {
+                    if (service === 'ollama') {
+                        // Ollama has no /api/unload — keep_alive:0 evicts it immediately.
+                        const res = await fetch(`${endpoint}/api/generate`, {
+                            method: 'POST', headers: authHeaders(),
+                            body: JSON.stringify({ model: modelId, keep_alive: 0 })
+                        });
+                        if (!res.ok) throw new Error(`Ollama unload ${res.status}: ${await res.text().catch(() => '')}`);
+                        await res.json().catch(() => null);
+                    } else {
+                        const m = models.find(x => x.id === modelId);
+                        const instanceId = (m && m.instanceId) || modelId;
+                        const res = await fetch(`${lmHost(endpoint)}/api/v1/models/unload`, {
+                            method: 'POST', headers: authHeaders(),
+                            body: JSON.stringify({ instance_id: instanceId })
+                        });
+                        if (!res.ok) {
+                            const t = await res.text().catch(() => '');
+                            if (/not loaded|no.*instance/i.test(t)) { flash(`"${modelId}" was not loaded.`); await refreshModels(); return; }
+                            throw new Error(`LM Studio unload ${res.status}: ${t}`);
+                        }
+                        await res.json().catch(() => null);
+                    }
+                    flash(`Unloaded ${modelId}.`);
+                    await refreshModels();
+                } catch (error) {
+                    console.error('Unload failed:', error);
+                    alert('Failed to unload model.\n\n' + explain(error));
+                } finally {
+                    setIsBusy(false);
+                }
+            };
+
+            const pullModel = async (modelName) => {
+                if (service !== 'ollama' || !modelName) return;
+                setIsBusy(true); setStatus(`Pulling ${modelName}…`);
+                try {
+                    await fetch(`${endpoint}/api/pull`, {
+                        method: 'POST', headers: authHeaders(),
+                        body: JSON.stringify({ name: modelName, stream: false })
+                    });
+                    flash(`Started pulling ${modelName}. Refresh in a moment.`);
+                    await refreshModels();
+                } catch (error) {
+                    console.error('Failed to pull model:', error);
+                    alert('Failed to pull model.\n\n' + explain(error));
+                } finally {
+                    setIsBusy(false);
+                }
+            };
+
+            const generatePrompt = async (isInspiration = false) => {
+                if (!selectedLLM || !endpoint || (!inputText.trim() && !isInspiration)) return;
+                isInspiration ? setIsInspiring(true) : setIsLoading(true);
+                if (!isInspiration) setOutputText('');
+                try {
+                    const creativityConfig = CREATIVITY_MODES[creativityMode];
+                    const systemPrompt = isInspiration
+                        ? `You are a creative assistant for generating video and image concepts.`
+                        : creativityConfig.systemPrompt(videoModel);
+                    const userPrompt = isInspiration
+                        ? `Generate 3 short, diverse scene ideas for a ${videoModel} prompt. Each should be 1-2 sentences and include different settings, emotions, or visual styles. Number them 1., 2., 3.`
+                        : inputText;
+                    const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }];
+
+                    const body = service === 'lmstudio'
+                        ? { model: selectedLLM, messages, temperature: creativityConfig.temperature, max_tokens: 500 }
+                        : { model: selectedLLM, messages, stream: false, options: { temperature: creativityConfig.temperature } };
+                    const apiUrl = service === 'lmstudio' ? `${endpoint}/chat/completions` : `${endpoint}/api/chat`;
+
+                    const response = await fetch(apiUrl, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+                    if (!response.ok) throw new Error(`API Error: ${response.status} ${response.statusText}\n${await response.text().catch(() => '')}`);
+                    const data = await response.json();
+                    const result = (service === 'lmstudio' ? data.choices[0].message.content : data.message.content).trim();
+
+                    if (isInspiration) { setInputText(result); }
+                    else {
+                        setOutputText(result);
+                        const newEntry = {
+                            id: Date.now(), timestamp: new Date().toISOString(),
+                            input: inputText, output: result,
+                            negativePrompt: negPromptLocked ? '' : negativePrompt,
+                            service, model: selectedLLM, creativity: creativityMode, videoModel, endpoint
+                        };
+                        const updatedHistory = [newEntry, ...history];
+                        setHistory(updatedHistory);
+                        localStorage.setItem('ai_prompt_crafter_history', JSON.stringify(updatedHistory));
+                    }
+                } catch (error) {
+                    console.error('Generation failed:', error);
+                    const errorMsg = 'Failed to generate.\n\n' + explain(error);
+                    isInspiration ? setInputText(errorMsg) : setOutputText(errorMsg);
+                } finally {
+                    isInspiration ? setIsInspiring(false) : setIsLoading(false);
+                }
+            };
+
+            const copyToClipboard = () => { if (outputRef.current) navigator.clipboard.writeText(outputRef.current.innerText); };
+            const clearHistory = () => { if (confirm('Clear all history?')) { setHistory([]); localStorage.removeItem('ai_prompt_crafter_history'); } };
+            const deleteHistoryItem = (id) => { const u = history.filter(i => i.id !== id); setHistory(u); localStorage.setItem('ai_prompt_crafter_history', JSON.stringify(u)); };
+            const exportHistory = (format) => {
+                const dataStr = format === 'json'
+                    ? JSON.stringify(history, null, 2)
+                    : ['timestamp,service,target_model,llm,creativity,input,output,negative_prompt',
+                        ...history.map(item => [item.timestamp, item.service, item.videoModel, item.model, item.creativity,
+                            `"${item.input.replace(/"/g, '""')}"`, `"${item.output.replace(/"/g, '""')}"`,
+                            `"${(item.negativePrompt || '').replace(/"/g, '""')}"`].join(','))].join('\n');
+                const blob = new Blob([dataStr], { type: format === 'json' ? 'application/json' : 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a'); link.href = url; link.download = `ai_prompt_history.${format}`; link.click();
+                URL.revokeObjectURL(url);
+            };
+
+            const config = SERVICE_CONFIGS[service];
+            const selModel = models.find(m => m.id === selectedLLM);
+            const busy = isLoading || isBusy;
+
+            return (
+                <div className="flex flex-col h-screen overflow-hidden bg-gray-900 text-gray-300">
+                    <header className="flex items-center justify-between px-6 py-3 bg-gray-800 border-b border-gray-700">
+                        <h1 className="text-2xl font-bold text-white">AI Prompt Crafter</h1>
+                        <div className="flex items-center gap-3">
+                            {status && <span className="text-sm text-blue-300">{status}</span>}
+                            <button onClick={() => setShowHistory(!showHistory)} className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
+                                <span aria-hidden>📜</span> History ({history.length})
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="flex flex-1 overflow-hidden">
+                        <div className={`flex-1 flex flex-col transition-all duration-300 ${showHistory ? 'w-2/3' : 'w-full'}`}>
+                            <div className="bg-gray-800 border-b border-gray-700 p-4 space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                    <div>
+                                        <label className="text-sm font-medium">Service:</label>
+                                        <select value={service} onChange={(e) => updateService(e.target.value)} className="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm">
+                                            <option value="lmstudio">LM Studio</option>
+                                            <option value="ollama">Ollama</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium block">Endpoint Base URL:</label>
+                                        <input type="text" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} className="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm" placeholder={config.defaultUrl} />
+                                    </div>
+                                    <div className={service === 'lmstudio' ? '' : 'opacity-40'}>
+                                        <label className="text-sm font-medium block">LM Studio API key (optional):</label>
+                                        <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} disabled={service !== 'lmstudio'} className="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm" placeholder="leave blank if not required" />
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2 items-end">
+                                    <div className="flex-1 min-w-[200px]">
+                                        <label className="text-sm font-medium block mb-1">LLM Model: {selModel && selModel.loaded && <span className="text-green-400">● loaded</span>}</label>
+                                        <select value={selectedLLM} onChange={(e) => setSelectedLLM(e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm" disabled={busy}>
+                                            <option value="">{models.length > 0 ? 'Select a model' : 'Refresh to see models'}</option>
+                                            {models.map(m => <option key={m.id} value={m.id}>{(m.loaded ? '● ' : '○ ') + m.id}</option>)}
+                                        </select>
+                                    </div>
+                                    <button onClick={refreshModels} disabled={busy} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm disabled:opacity-50"><span aria-hidden>🔄</span> Refresh</button>
+                                    <button onClick={() => loadModel(selectedLLM)} disabled={busy || !selectedLLM} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded text-sm disabled:opacity-50">⬆ Load</button>
+                                    <button onClick={() => unloadModel(selectedLLM)} disabled={busy || !selectedLLM} className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 rounded text-sm disabled:opacity-50">⬇ Unload</button>
+                                    {config.pullVisible && (
+                                        <button onClick={() => { const n = prompt('Model to pull (e.g., llama3:latest):'); if (n) pullModel(n); }} disabled={busy} className="px-3 py-1.5 bg-green-700 hover:bg-green-800 rounded text-sm disabled:opacity-50">Pull</button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="text-sm font-medium">Target Model:</label>
+                                        <select value={videoModel} onChange={(e) => setVideoModel(e.target.value)} className="w-full mt-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm">
+                                            <option value="wan2.2">Wan 2.2 (Video)</option>
+                                            <option value="flux">Flux (Image)</option>
+                                            <option value="qwen">Qwen (Image)</option>
+                                        </select>
+                                    </div>
+                                    <div className="md:col-span-2 flex gap-2 items-center pt-5">
+                                        <button onClick={() => setCreativityMode('precise')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${creativityMode === 'precise' ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>Precise</button>
+                                        <button onClick={() => setCreativityMode('creative')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${creativityMode === 'creative' ? 'bg-purple-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>Creative</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 overflow-auto">
+                                <div className="flex flex-col h-full">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h2 className="text-lg font-semibold text-blue-400">Input</h2>
+                                        <button onClick={() => generatePrompt(true)} disabled={busy || isInspiring || !selectedLLM} className="flex items-center gap-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm disabled:opacity-50"><span aria-hidden>✨</span> {isInspiring ? 'Inspiring...' : 'Inspire Me'}</button>
+                                    </div>
+                                    <textarea value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="Describe your video or image scene..." className="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" disabled={isLoading}></textarea>
+                                </div>
+                                <div className="flex flex-col h-full">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h2 className="text-lg font-semibold text-green-400">Output</h2>
+                                        <button onClick={copyToClipboard} disabled={!outputText || isLoading} className="flex items-center gap-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm disabled:opacity-50"><span aria-hidden>📋</span> Copy</button>
+                                    </div>
+                                    <div ref={outputRef} className="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3 overflow-auto whitespace-pre-wrap">
+                                        {isLoading ? <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div> : (outputText || <span className="text-gray-500">Generated prompt will appear here...</span>)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="px-4 pb-4 space-y-4">
+                                <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-md font-semibold">Negative Prompt</h3>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            {negPromptLocked ? <span aria-hidden>🔒</span> : <span aria-hidden>🔓</span>}
+                                            <span className="text-sm">{negPromptLocked ? 'Locked' : 'Unlocked'}</span>
+                                            <input type="checkbox" checked={!negPromptLocked} onChange={(e) => setNegPromptLocked(!e.target.checked)} className="sr-only" />
+                                        </label>
+                                    </div>
+                                    <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} placeholder="Elements to exclude..." className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" disabled={negPromptLocked} rows={2}></textarea>
+                                </div>
+                                <button onClick={() => generatePrompt(false)} disabled={!inputText.trim() || !selectedLLM || isLoading} className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                                    {isLoading ? 'Generating...' : `Generate ${videoModel.toUpperCase()} Prompt`}
+                                </button>
+                            </div>
+                        </div>
+
+                        {showHistory && (
+                            <div className="w-1/3 max-w-md bg-gray-800 border-l border-gray-700 flex flex-col">
+                                <div className="p-4 border-b border-gray-700">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h2 className="text-lg font-semibold">History</h2>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => exportHistory('json')} className="p-1 hover:bg-gray-700 rounded" title="Export JSON"><span aria-hidden>📦</span></button>
+                                            <button onClick={() => exportHistory('csv')} className="p-1 hover:bg-gray-700 rounded" title="Export CSV"><span aria-hidden>📄</span></button>
+                                            <button onClick={clearHistory} className="p-1 hover:bg-red-800 rounded text-red-400" title="Clear History"><span aria-hidden>🗑️</span></button>
+                                        </div>
+                                    </div>
+                                    <input type="text" value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} placeholder="Search history..." className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-sm" />
+                                </div>
+                                <div className="flex-1 overflow-auto p-4 space-y-3">
+                                    {filteredHistory.length === 0 ? (
+                                        <div className="text-gray-500 text-center py-8">{historySearch ? 'No matching entries' : 'No history yet'}</div>
+                                    ) : (
+                                        filteredHistory.map((item) => (
+                                            <div key={item.id} className="bg-gray-700 rounded-lg p-3 space-y-2 group">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-xs text-gray-400 mb-1">{new Date(item.timestamp).toLocaleString()}</div>
+                                                        <div className="text-sm font-medium truncate" title={item.input}>{item.input}</div>
+                                                    </div>
+                                                    <button onClick={() => deleteHistoryItem(item.id)} className="p-1 hover:bg-red-800 rounded text-red-400 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" title="Delete"><span aria-hidden>🗑️</span></button>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2 text-xs">
+                                                    <span className="bg-gray-600 px-2 py-1 rounded">{item.service}</span>
+                                                    <span className="bg-blue-800 px-2 py-1 rounded">{item.videoModel}</span>
+                                                    <span className="bg-purple-800 px-2 py-1 rounded truncate max-w-[100px]" title={item.model}>{item.model}</span>
+                                                    <span className="bg-green-800 px-2 py-1 rounded">{CREATIVITY_MODES[item.creativity] ? CREATIVITY_MODES[item.creativity].name : item.creativity}</span>
+                                                </div>
+                                                <button onClick={() => {
+                                                    setInputText(item.input); setOutputText(item.output);
+                                                    setNegativePrompt(item.negativePrompt || ''); setNegPromptLocked(!item.negativePrompt);
+                                                    setService(item.service); setEndpoint(item.endpoint); setSelectedLLM(item.model);
+                                                    setCreativityMode(item.creativity); setVideoModel(item.videoModel);
+                                                }} className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm font-semibold"><span aria-hidden>🔄</span> Load Prompt</button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

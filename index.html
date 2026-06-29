@@ -422,6 +422,13 @@
             </div>
           </sc-if>
 
+          <!-- PROMPT CRAFTER -->
+          <sc-if value="{{ win.isPrompt }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;position:relative;background:#111827;">
+              <iframe src="apps/prompt-crafter.html" style="width:100%;height:100%;border:none;display:block;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads allow-modals allow-popups-to-escape-sandbox"></iframe>
+            </div>
+          </sc-if>
+
           <!-- ADMIN -->
           <sc-if value="{{ win.isAdmin }}" hint-placeholder-val="{{ false }}">
             <div style="flex:1;min-height:0;position:relative;background:#14141a;">
@@ -942,7 +949,7 @@ class Component extends DCLogic {
   FS(){
     const note = (txt)=>({ type:'file', app:'notepad', content:txt });
     const _ICN = this.osIcons();
-    const programs = ['terminal','browser','paint','calc','notepad','flasher','dork','aboutme','admin','settings'].map(function(a){ return { name:(_ICN[a]&&_ICN[a].label)||a, icon:(_ICN[a]&&_ICN[a].icon)||'📦', type:'file', app:a }; });
+    const programs = ['terminal','browser','paint','calc','notepad','flasher','dork','aboutme','admin','prompt','settings'].map(function(a){ return { name:(_ICN[a]&&_ICN[a].label)||a, icon:(_ICN[a]&&_ICN[a].icon)||'📦', type:'file', app:a }; });
     return { name:'This PC', children:[
       { name:'Local Disk (C:)', icon:'💽', type:'drive', children:[
         { name:'Windows', icon:'📁', type:'folder', children:[] },
@@ -979,7 +986,7 @@ class Component extends DCLogic {
   appDefs(){ return {
     terminal:['Terminal',700,440], calc:['Calculator',300,452], notepad:['Notepad',560,440],
     paint:['Paint',780,540], browser:['Web Browser',960,640], explorer:['Files',760,500], settings:['Settings',740,560],
-    flasher:['ESP Flasher',1040,1030], dork:['Dork Generator',920,700], aboutme:['About Me',860,600], admin:['Admin',900,640]
+    flasher:['ESP Flasher',1040,1030], dork:['Dork Generator',920,700], aboutme:['About Me',860,600], admin:['Admin',900,640], prompt:['Prompt Crafter',1040,720]
   }; }
   iconFor(app){ const I=this.osIcons(); return (I[app]&&I[app].icon) || '▦'; }
   osIcons(){
@@ -996,6 +1003,7 @@ class Component extends DCLogic {
       dork:{ icon:'\uD83D\uDD0D', label:'Dork Generator' },
       aboutme:{ icon:'👤', label:'About Me' },
       admin:{ icon:'🔧', label:'Admin' },
+      prompt:{ icon:'✨', label:'Prompt Crafter' },
       trash:{ icon:'🗑️', label:'Recycle Bin' },
     };
     if(os==='classic') return { ...base,
@@ -1014,6 +1022,7 @@ class Component extends DCLogic {
       dork:{ icon:'\uD83D\uDD0D', label:'Dork Generator' },
       aboutme:{ icon:'👤', label:'About Me' },
       admin:{ icon:'🔧', label:'Admin' },
+      prompt:{ icon:'✨', label:'Prompt Crafter' },
       trash:{ icon:'🗑️', label:'Trash' } };
     if(os==='linux') return {
       explorer:{ icon:'🏠', label:'Home' },
@@ -1027,6 +1036,7 @@ class Component extends DCLogic {
       dork:{ icon:'\uD83D\uDD0D', label:'Dork Generator' },
       aboutme:{ icon:'👤', label:'About Me' },
       admin:{ icon:'🔧', label:'Admin' },
+      prompt:{ icon:'✨', label:'Prompt Crafter' },
       trash:{ icon:'🗑️', label:'Trash' } };
     if(os==='terminal') return {
       explorer:{ icon:'~/', label:'files', box:true },
@@ -1040,6 +1050,7 @@ class Component extends DCLogic {
       dork:{ icon:'?', label:'dork', box:true },
       aboutme:{ icon:'i', label:'about', box:true },
       admin:{ icon:'#', label:'admin', box:true },
+      prompt:{ icon:'>', label:'prompt', box:true },
       trash:{ icon:'x', label:'.trash', box:true } };
     return base; // fluent
   }
@@ -1048,7 +1059,7 @@ class Component extends DCLogic {
     // each app has a home region; repeats jitter around it so nothing stacks exactly
     const homes = {
       terminal:[0.50,0.44], browser:[0.62,0.40], flasher:[0.30,0.50], settings:[0.30,0.56],
-      explorer:[0.28,0.36], paint:[0.46,0.50], calc:[0.40,0.40], notepad:[0.58,0.58], dork:[0.55,0.46], aboutme:[0.5,0.42], admin:[0.45,0.44]
+      explorer:[0.28,0.36], paint:[0.46,0.50], calc:[0.40,0.40], notepad:[0.58,0.58], dork:[0.55,0.46], aboutme:[0.5,0.42], admin:[0.45,0.44], prompt:[0.5,0.46]
     };
     const seq = [[0.50,0.44],[0.27,0.34],[0.72,0.40],[0.34,0.64],[0.66,0.62],[0.50,0.30],[0.80,0.58],[0.20,0.54]];
     const home = homes[app] || seq[openCount % seq.length];
@@ -1562,7 +1573,7 @@ class Component extends DCLogic {
       return {
         id:w.id, app:w.app, title:w.title,
         isTerminal:w.app==='terminal', isCalc:w.app==='calc', isNotepad:w.app==='notepad',
-        isPaint:w.app==='paint', isBrowser:w.app==='browser', isExplorer:w.app==='explorer', isSettings:w.app==='settings', isFlasher:w.app==='flasher', isDork:w.app==='dork', isAboutme:w.app==='aboutme', isAdmin:w.app==='admin',
+        isPaint:w.app==='paint', isBrowser:w.app==='browser', isExplorer:w.app==='explorer', isSettings:w.app==='settings', isFlasher:w.app==='flasher', isDork:w.app==='dork', isAboutme:w.app==='aboutme', isAdmin:w.app==='admin', isPrompt:w.app==='prompt',
         style: { position:'absolute', ...geom, zIndex:w.z, display: w.min?'none':'flex', flexDirection:'column',
           background:'var(--win-bg)', color:'var(--win-text)', border:'var(--win-border)',
           borderRadius: w.max?'0':'var(--win-radius)', boxShadow:'var(--win-shadow)', overflow:'hidden',
@@ -1628,7 +1639,7 @@ class Component extends DCLogic {
 
     // ----- per-OS app icon map -----
     const APPICONS = this.osIcons();
-    const APPORDER = ['explorer','browser','terminal','flasher','dork','aboutme','admin','paint','calc','notepad','settings'];
+    const APPORDER = ['explorer','browser','terminal','flasher','dork','aboutme','admin','prompt','paint','calc','notepad','settings'];
     const big = isLinux;
     const startApps = APPORDER.map(app=>{ const ic=APPICONS[app]; const boxed=!!ic.box; return { app, icon:ic.icon, name:ic.label,
       style: big
