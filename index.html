@@ -941,10 +941,12 @@ class Component extends DCLogic {
   // ---------- filesystem ----------
   FS(){
     const note = (txt)=>({ type:'file', app:'notepad', content:txt });
+    const _ICN = this.osIcons();
+    const programs = ['terminal','browser','paint','calc','notepad','flasher','dork','aboutme','admin','settings'].map(function(a){ return { name:(_ICN[a]&&_ICN[a].label)||a, icon:(_ICN[a]&&_ICN[a].icon)||'📦', type:'file', app:a }; });
     return { name:'This PC', children:[
       { name:'Local Disk (C:)', icon:'💽', type:'drive', children:[
         { name:'Windows', icon:'📁', type:'folder', children:[] },
-        { name:'Program Files', icon:'📁', type:'folder', children:[] },
+        { name:'Programs', icon:'📁', type:'folder', children: programs },
         { name:'Users', icon:'📁', type:'folder', children:[
           { name:'me', icon:'📁', type:'folder', children:[
             Object.assign({ name:'resume.txt' }, note("RESUME\n======\n[ Your Name ]\nEngineer · Technician · Security\n\n— fill this in, or just run /about --me in the Terminal —")),
@@ -1537,7 +1539,7 @@ class Component extends DCLogic {
   onSetWallpaper = (e)=>{ this.setState({ wallpaper:e.currentTarget.dataset.wall }, ()=>this.savePrefs()); };
 
   // ---------- render ----------
-  fileIcon(it){ if(it.icon && it.type!=='file') return it.icon; if(it.type==='drive') return '💽'; if(it.type==='folder') return '📁'; const n=it.name||''; if(/\.(png|jpg|jpeg|gif|bmp)$/i.test(n)) return '🖼️'; if(/\.pdf$/i.test(n)) return '📕'; if(/\.(md|txt|log)$/i.test(n)) return '📄'; return '📄'; }
+  fileIcon(it){ if(it.icon) return it.icon; if(it.type==='drive') return '💽'; if(it.type==='folder') return '📁'; const n=it.name||''; if(/\.(png|jpg|jpeg|gif|bmp)$/i.test(n)) return '🖼️'; if(/\.pdf$/i.test(n)) return '📕'; if(/\.(md|txt|log)$/i.test(n)) return '📄'; return '📄'; }
 
   renderVals(){
     const s = this.state;
