@@ -251,17 +251,14 @@
         <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;">
           <!-- TERMINAL -->
           <sc-if value="{{ win.isTerminal }}" hint-placeholder-val="{{ false }}">
-            <div onclick="{{ focusTermInput }}" style="flex:1;min-height:0;display:flex;flex-direction:column;background:#0a0a12;padding:10px 12px;position:relative;overflow:hidden;">
-              <canvas ref="{{ matrixRef }}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0.16;pointer-events:none;z-index:0;"></canvas>
-              <div style="position:absolute;inset:0;pointer-events:none;z-index:1;background:repeating-linear-gradient(0deg,rgba(0,255,120,0.05),rgba(0,255,120,0.05) 1px,transparent 1px,transparent 3px);"></div>
-              <div style="position:absolute;inset:0;pointer-events:none;z-index:1;box-shadow:inset 0 0 60px rgba(0,255,120,0.18);border-radius:6px;"></div>
-              <div ref="{{ termBodyRef }}" style="flex:1;min-height:0;overflow:auto;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.5;position:relative;z-index:2;">
+            <div onclick="{{ focusTermInput }}" style="flex:1;min-height:0;display:flex;flex-direction:column;background:var(--win-bg);padding:10px 12px;">
+              <div ref="{{ termBodyRef }}" style="flex:1;min-height:0;overflow:auto;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.5;">
                 <sc-for list="{{ terminalLines }}" as="line" hint-placeholder-count="5">
                   <div style="{{ line.style }}">{{ line.x }}</div>
                 </sc-for>
                 <div style="display:flex;gap:8px;align-items:baseline;margin-top:2px;">
-                  <span style="color:#00ff66;text-shadow:0 0 7px rgba(0,255,120,0.7);white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:13px;">{{ termPrompt }}</span>
-                  <input ref="{{ termInputRef }}" value="{{ termInput }}" onchange="{{ onTermInput }}" onkeydown="{{ onTermKey }}" spellcheck="false" autocomplete="off" style="flex:1;background:transparent;border:none;outline:none;color:#5af78e;caret-color:#00ff66;text-shadow:0 0 6px rgba(0,255,140,0.5);font-family:'JetBrains Mono',monospace;font-size:13px;">
+                  <span style="color:var(--accent);white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:13px;">{{ termPrompt }}</span>
+                  <input ref="{{ termInputRef }}" value="{{ termInput }}" onchange="{{ onTermInput }}" onkeydown="{{ onTermKey }}" spellcheck="false" autocomplete="off" style="flex:1;background:transparent;border:none;outline:none;color:var(--win-text);font-family:'JetBrains Mono',monospace;font-size:13px;">
                 </div>
               </div>
             </div>
@@ -1281,31 +1278,6 @@ class Component extends DCLogic {
 
   // ---------- browser ----------
   iframeRef = (n)=>{ this.iframeEl = n; };
-  matrixRef = (node)=>{
-    if(this._mtxRAF){ cancelAnimationFrame(this._mtxRAF); this._mtxRAF=null; }
-    if(this._mtxRO){ try{ this._mtxRO.disconnect(); }catch(e){} this._mtxRO=null; }
-    if(!node) return;
-    const ctx = node.getContext('2d');
-    const glyphs = 'アカサタナハマヤラワ0123456789ABCDEF#$%*+=<>/|'.split('');
-    const fs = 14; let drops = [];
-    const size = ()=>{ const r=node.getBoundingClientRect(); node.width=Math.max(1,Math.floor(r.width)); node.height=Math.max(1,Math.floor(r.height)); const cols=Math.max(1,Math.floor(node.width/fs)); const rows=Math.max(1,Math.floor(node.height/fs)); drops=Array(cols).fill(0).map(()=>Math.floor(Math.random()*rows)); };
-    size();
-    try{ this._mtxRO = new ResizeObserver(size); this._mtxRO.observe(node); }catch(e){}
-    const draw = ()=>{
-      ctx.fillStyle='rgba(10,10,18,0.10)'; ctx.fillRect(0,0,node.width,node.height);
-      ctx.font = fs + "px 'JetBrains Mono', monospace";
-      for(let i=0;i<drops.length;i++){
-        const ch = glyphs[Math.floor(Math.random()*glyphs.length)];
-        const y = drops[i]*fs;
-        ctx.fillStyle = Math.random()>0.93 ? '#aaffd5' : '#00ff66';
-        ctx.fillText(ch, i*fs, y);
-        if(y>node.height && Math.random()>0.975) drops[i]=0;
-        drops[i]++;
-      }
-      this._mtxRAF = requestAnimationFrame(draw);
-    };
-    draw();
-  };
   onBrowserInput = (e)=>{ this.setState({ browserInput: e.target.value }); };
   navigate(u){ this.setState(s=>{ const hist=s.bHist.slice(0,s.bIdx+1); hist.push(u); return { browserUrl:u, browserInput:u, bHist:hist, bIdx:hist.length-1 }; }); }
   onBrowserKey = (e)=>{
@@ -1583,8 +1555,8 @@ class Component extends DCLogic {
     const isTerminalShell = s.osStyle==='terminal';
     const showTopBar = isMac || isLinux;
     const showBottomBar = isWin95 || isWin11 || isTerminalShell;
-    const lineColor = { cmd:'#5af78e', out:'#9dffce', err:'#ff5f56', accent:'#00f0ff', dim:'#3f8f6f' };
-    const terminalLines = s.termLines.map(l=>({ x: l.x==='' ? '\u00a0' : l.x, style:{ color: lineColor[l.t]||'#9dffce', whiteSpace:'pre-wrap', fontFamily:"'JetBrains Mono',monospace", textShadow:'0 0 6px rgba(0,255,140,0.45)' } }));
+    const lineColor = { cmd:'var(--accent)', out:'var(--win-text)', err:'#ff6b5e', accent:'var(--accent)', dim:'var(--muted)' };
+    const terminalLines = s.termLines.map(l=>({ x: l.x==='' ? '\u00a0' : l.x, style:{ color: lineColor[l.t]||'var(--win-text)', whiteSpace:'pre-wrap', fontFamily:"'JetBrains Mono',monospace" } }));
 
     const windows = s.windows.map(w=>{
       const active = !w.min && w.z===s.maxZ;
@@ -1862,7 +1834,7 @@ class Component extends DCLogic {
       onWinFocus:this.onWinFocus, onTitleDown:this.onTitleDown, onResizeDown:this.onResizeDown,
       onWinClose:this.onWinClose, onWinMin:this.onWinMin, onWinMax:this.onWinMax, onTaskItem:this.onTaskItem,
       onStartToggle:this.onStartToggle, onStartApp:this.onStartApp, onCtxItem:this.onCtxItem, stop:this.stop,
-      onTermInput:this.onTermInput, onTermKey:this.onTermKey, termInputRef:this.termInputRef, termBodyRef:this.termBodyRef, focusTermInput:this.focusTermInput, matrixRef:this.matrixRef,
+      onTermInput:this.onTermInput, onTermKey:this.onTermKey, termInputRef:this.termInputRef, termBodyRef:this.termBodyRef, focusTermInput:this.focusTermInput,
       onCalcClick:this.onCalcClick, onNotepad:this.onNotepad,
       paintRef:undefined, onPaintColor:this.onPaintColor, onPaintSize:this.onPaintSize, onPaintClear:this.onPaintClear,
       iframeRef:this.iframeRef, onBrowserInput:this.onBrowserInput, onBrowserKey:this.onBrowserKey, onBrowserBack:this.onBrowserBack, onBrowserFwd:this.onBrowserFwd, onBrowserReload:this.onBrowserReload,
