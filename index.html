@@ -499,6 +499,15 @@
                 </sc-for>
               </div>
 
+              <!-- UI screenshots (per selected board; e.g. C5 WiFi Analyzer) -->
+              <sc-if value="{{ flashHasShots }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:6px;flex-shrink:0;overflow-x:auto;padding:2px 0;">
+                  <sc-for list="{{ flashShots }}" as="sh" hint-placeholder-count="4">
+                    <img data-photo="{{ sh.url }}" alt="WiFi Analyzer UI" style="height:152px;border-radius:8px;border:1px solid rgba(255,255,255,.14);flex-shrink:0;background:#07070d;">
+                  </sc-for>
+                </div>
+              </sc-if>
+
               <!-- connect + flash, one row -->
               <div style="display:flex;gap:10px;flex-shrink:0;">
                 <button onclick="{{ onFlashConnect }}" style="{{ flashConnectStyle }}">{{ flashConnectLabel }}</button>
@@ -1319,6 +1328,12 @@ class Component extends DCLogic {
       // ESP-IDF "flash" output — auto-read flasher_args.json for exact offsets/files; fallback below
       flasherArgs:true,
       defaultBaud:'115200',
+      shots:[
+        'https://raw.githubusercontent.com/Wontfallo/wontfallo.github.io/main/assets/wa-spectrum.svg',
+        'https://raw.githubusercontent.com/Wontfallo/wontfallo.github.io/main/assets/wa-list.svg',
+        'https://raw.githubusercontent.com/Wontfallo/wontfallo.github.io/main/assets/wa-wifi6.svg',
+        'https://raw.githubusercontent.com/Wontfallo/wontfallo.github.io/main/assets/wa-detail.svg',
+      ],
       manifest:[
         { name:'bootloader.bin', address:0x2000,  required:true  },
         { name:'partitions.bin', address:0x8000,  required:true  },
@@ -1788,6 +1803,8 @@ class Component extends DCLogic {
       hasBack: !!previewDev.img2,
       isHover: !!fl.hover,
     };
+    const flashShots = (previewDev.shots||[]).map((u,i)=>({ url:u, k:previewDev.id+'-'+i }));
+    const flashHasShots = flashShots.length>0;
     const flashIsRemote = fl.source==='remote';
     const flashIsCustom = fl.source==='custom';
     const flashPrimaryDisabled = !fl.connected || fl.busy;
@@ -1830,7 +1847,7 @@ class Component extends DCLogic {
       flashRemoteBtnStyle, flashCustomBtnStyle, flashConnectLabel, flashConnectStyle, flashStartLabel,
       flashStartStyle, flashPrimaryDisabled, flashProgStyle, flashStage: fl.stage, flashProgress: fl.progress,
       flashConnected: fl.connected, flashBusy: fl.busy, flashBaud: fl.baud, flashEraseAll: fl.eraseAll,
-      flashBaseShown: this.fwBase(), flashDevices, flashDeviceName: this.curDevice().name,
+      flashBaseShown: this.fwBase(), flashDevices, flashShots, flashHasShots, flashDeviceName: this.curDevice().name,
       onFlashDevice: this.onFlashDevice,
       onFlashConnect: this.onFlashConnect, onFlashDisconnect: this.onFlashDisconnect, onFlashStart: this.onFlashStart, onFlashErase: this.onFlashErase,
       onFlashSource: this.onFlashSource, onFlashBaud: this.onFlashBaud, onFlashEraseToggle: this.onFlashEraseToggle, onFlashClear: this.onFlashClear,

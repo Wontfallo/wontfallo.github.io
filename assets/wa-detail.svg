@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 320" font-family="Consolas,Menlo,monospace">
+  <rect width="240" height="320" fill="#07070d"/>
+  <!-- faint spectrum behind -->
+  <path d="M20 150 Q55 90 92 150 Z" fill="#ff2d8e" fill-opacity="0.12"/>
+  <path d="M150 150 Q188 108 226 150 Z" fill="#00e5ff" fill-opacity="0.12"/>
+  <!-- detail panel -->
+  <rect x="12" y="66" width="216" height="248" rx="8" fill="#14142a" stroke="#00e676" stroke-width="2"/>
+  <text x="24" y="88" fill="#fff" font-size="15" font-weight="bold">NETGEAR-5G</text>
+  <text x="24" y="112" fill="#c724b1" font-size="10">BSSID  A4:2B:8C:11:5F:E0</text>
+  <text x="24" y="130" fill="#00e5ff" font-size="10">CH 44    80 MHz    5G</text>
+  <text x="24" y="146" fill="#00e676" font-size="10">Wi-Fi  802.11ax (Wi-Fi 6)</text>
+  <text x="24" y="162" fill="#00e5ff" font-size="10">Security   WPA2</text>
+  <text x="24" y="178" fill="#00e5ff" font-size="10">Signal     -46 dBm</text>
+  <rect x="24" y="186" width="192" height="10" fill="none" stroke="#c724b1"/>
+  <rect x="25" y="187" width="150" height="8" fill="#00e676"/>
+  <!-- actions -->
+  <rect x="24" y="210" width="192" height="30" rx="5" fill="#07070d" stroke="#ff2d8e"/>
+  <text x="120" y="230" fill="#ff2d8e" font-size="12" text-anchor="middle">DEAUTH</text>
+  <rect x="24" y="248" width="192" height="30" rx="5" fill="#07070d" stroke="#00e5ff"/>
+  <text x="120" y="268" fill="#00e5ff" font-size="12" text-anchor="middle">CLONE (Evil Twin)</text>
+  <rect x="24" y="286" width="192" height="30" rx="5" fill="#07070d" stroke="#c724b1"/>
+  <text x="120" y="306" fill="#c724b1" font-size="12" text-anchor="middle">CLOSE</text>
+</svg>
