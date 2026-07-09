@@ -2,6 +2,9 @@
 
 WontOS — a browser desktop with a built-in ESP32 web flasher, served via GitHub Pages.
 
+
+![WontOs-C5_Preview-ESP-Flasher](assets/WontOS-ESP_Flasher-C5_Preview.png)
+
 ## Structure
 
 This site was previously a single self-unpacking `index.html` bundle (~280 KB, everything
