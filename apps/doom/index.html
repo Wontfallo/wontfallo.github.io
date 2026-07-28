@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DOOM</title>
+<style>
+  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url(../../assets/fonts/jbmono-latin.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #0a0a0c;
+    color: #d8d8de;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  body { display: flex; flex-direction: column; }
+
+  /* ---- stage ---- */
+  .stage {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+      radial-gradient(circle at 50% 40%, rgba(255,60,40,.07), transparent 60%),
+      #000;
+    padding: 8px;
+  }
+
+  /* The canvas must have no border/padding or mouse coords go wrong. */
+  #canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    aspect-ratio: 4 / 3;
+    background: #000;
+    outline: none;
+    image-rendering: pixelated;
+    box-shadow: 0 0 0 1px #2a2a30, 0 10px 40px rgba(0,0,0,.6);
+  }
+
+  /* ---- loading overlay ---- */
+  #loading {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: #000;
+  }
+  #loading.done { display: none; }
+
+  .skull { font-size: 38px; filter: drop-shadow(0 0 12px rgba(255,60,40,.55)); }
+
+  .wordmark {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: 12px;
+    text-indent: 12px;
+    color: #ff2b1a;
+    text-shadow: 0 0 10px rgba(255,43,26,.55), 0 0 34px rgba(122,0,0,.8);
+  }
+
+  #status { font-size: 12px; letter-spacing: 1.5px; color: #9a9aa2; text-transform: uppercase; }
+
+  #bar {
+    width: min(320px, 70%);
+    height: 8px;
+    border: 1px solid #4a1c18;
+    background: #160707;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #barfill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #7a0000, #ff2b1a);
+    transition: width .25s ease;
+  }
+
+  /* ---- click-to-focus veil ---- */
+  #focusveil {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,.55);
+    cursor: pointer;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #ffd7d2;
+  }
+  #focusveil.show { display: flex; }
+  #focusveil span {
+    border: 1px solid rgba(255,43,26,.5);
+    background: rgba(20,4,4,.85);
+    padding: 10px 18px;
+    border-radius: 6px;
+  }
+
+  /* ---- bottom bar ---- */
+  .bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 12px;
+    background: #101014;
+    border-top: 1px solid #26262e;
+    font-size: 11.5px;
+    color: #8b8b95;
+    flex-wrap: wrap;
+  }
+
+  .bar .keys { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .bar .spacer { flex: 1; }
+
+  kbd {
+    background: #1c1c22;
+    border: 1px solid #3a3a44;
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font: inherit;
+    font-size: 11px;
+    color: #e2e2e8;
+  }
+
+  button {
+    background: #1a1a20;
+    color: #ff5a48;
+    border: 1px solid #4a1c18;
+    border-radius: 5px;
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 5px 11px;
+    cursor: pointer;
+  }
+  button:hover { background: #2a0c0a; border-color: #ff2b1a; color: #ff7a68; }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <canvas id="canvas" width="800" height="600" oncontextmenu="event.preventDefault()" tabindex="0"></canvas>
+
+  <div id="focusveil"><span>Click to play</span></div>
+
+  <div id="loading">
+    <div class="skull">&#128128;</div>
+    <div class="wordmark">DOOM</div>
+    <div id="status">Loading…</div>
+    <div id="bar"><div id="barfill"></div></div>
+  </div>
+</div>
+
+<div class="bar">
+  <div class="keys">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move
+    <span>·</span>
+    <kbd>Space</kbd> fire
+    <span>·</span>
+    <kbd>E</kbd> use
+    <span>·</span>
+    <kbd>Shift</kbd> run
+    <span>·</span>
+    <kbd>1</kbd>–<kbd>7</kbd> weapon
+    <span>·</span>
+    <kbd>Tab</kbd> map
+    <span>·</span>
+    <kbd>Esc</kbd> menu
+  </div>
+  <div class="spacer"></div>
+  <button id="fsbtn" type="button">Fullscreen</button>
+</div>
+
+<script>
+  var statusEl  = document.getElementById('status');
+  var loadingEl = document.getElementById('loading');
+  var barFill   = document.getElementById('barfill');
+  var canvas    = document.getElementById('canvas');
+  var veil      = document.getElementById('focusveil');
+
+  var commonArgs = ['-iwad', 'doom1.wad', '-window', '-nogui', '-nomusic', '-config', 'default.cfg'];
+
+  // SDL grabs the pointer for mouse-look. Some embeddings (sandboxed or nested
+  // frames) refuse pointer lock outright — keep that from surfacing as an
+  // uncaught error, the game stays playable with keyboard + windowed mouse.
+  (function () {
+    var proto = Element.prototype;
+    if (!proto.requestPointerLock) return;
+    var native = proto.requestPointerLock;
+    proto.requestPointerLock = function () {
+      try {
+        var r = native.apply(this, arguments);
+        if (r && typeof r.catch === 'function') r.catch(function () {});
+        return r;
+      } catch (e) {
+        console.warn('pointer lock unavailable:', e.message);
+      }
+    };
+  })();
+
+  var Module = {
+    noInitialRun: true,
+    arguments: commonArgs,
+    preRun: function () {
+      Module.FS.createPreloadedFile('', 'doom1.wad', 'doom1.wad', true, true);
+      Module.FS.createPreloadedFile('', 'default.cfg', 'default.cfg', true, true);
+    },
+    onRuntimeInitialized: function () {
+      callMain(commonArgs);
+      loadingEl.classList.add('done');
+      focusGame();
+    },
+    print: function (text) { console.log(text); },
+    printErr: function (text) {
+      if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+      console.error(text);
+    },
+    canvas: (function () {
+      canvas.addEventListener('webglcontextlost', function (e) {
+        e.preventDefault();
+        statusEl.textContent = 'Graphics context lost — reopen the app';
+        loadingEl.classList.remove('done');
+      }, false);
+      return canvas;
+    })(),
+    setStatus: function (text) { if (text) statusEl.textContent = text; },
+    totalDependencies: 0,
+    monitorRunDependencies: function (left) {
+      this.totalDependencies = Math.max(this.totalDependencies, left);
+      var done = this.totalDependencies - left;
+      if (this.totalDependencies > 0) {
+        barFill.style.width = Math.round((done / this.totalDependencies) * 100) + '%';
+      }
+      Module.setStatus(left ? 'Loading… ' + done + '/' + this.totalDependencies : 'Ripping and tearing…');
+    }
+  };
+
+  window.onerror = function (message) {
+    statusEl.textContent = 'Failed to start — see browser console';
+    loadingEl.classList.remove('done');
+    console.error(message);
+  };
+
+  // Keyboard input only reaches the game while the canvas has focus. Inside a
+  // WontOS window the user may click the title bar instead, so show a nudge
+  // whenever focus has drifted away.
+  function focusGame() {
+    canvas.focus();
+    veil.classList.remove('show');
+    resumeAudio();
+  }
+  canvas.addEventListener('blur', function () {
+    if (loadingEl.classList.contains('done')) veil.classList.add('show');
+  });
+  canvas.addEventListener('focus', function () { veil.classList.remove('show'); });
+  veil.addEventListener('mousedown', function (e) { e.preventDefault(); focusGame(); });
+  document.getElementById('stage').addEventListener('mousedown', focusGame);
+  window.addEventListener('focus', function () {
+    if (loadingEl.classList.contains('done')) canvas.focus();
+  });
+
+  // Browsers keep audio suspended until a user gesture.
+  function resumeAudio() {
+    try {
+      if (Module.SDL2 && Module.SDL2.audioContext && Module.SDL2.audioContext.state === 'suspended') {
+        Module.SDL2.audioContext.resume();
+      }
+    } catch (e) { /* audio is optional */ }
+  }
+  document.addEventListener('keydown', resumeAudio);
+
+  document.getElementById('fsbtn').addEventListener('click', function () {
+    var el = document.getElementById('stage');
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    setTimeout(focusGame, 60);
+  });
+</script>
+<script src="websockets-doom.js"></script>
+</body>
+</html>
